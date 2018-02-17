@@ -55,24 +55,6 @@ class KDNode:
         return max([min_height] + [c.height() + 1 for c, p in self.children])
 
 
-def level_order(tree, include_all=False):
-    """ Returns an iterator over the tree in level-order
-    If include_all is set to True, empty parts of the tree are filled
-    with dummy entries and the iterator becomes infinite. """
-
-    q = deque()
-    q.append(tree)
-    while q:
-        node = q.popleft()
-        yield node
-
-        if include_all or node.left:
-            q.append(node.left or node.__class__())
-
-        if include_all or node.right:
-            q.append(node.right or node.__class__())
-
-
 def check_dimensionality(point_list, dimensions=None):
     dimensions = dimensions or len(point_list[0])
     for p in point_list:
@@ -108,29 +90,45 @@ def construct_kdtree(point_list=None, dimensions=None, axis=0, axis_calc=None):
 
     return KDNode(loc, left, right, axis=axis, child_axis_calculator=axis_calc, dimensions=dimensions)
 
+def buildNetworkxGraph(current_node, graph, posx, posy, width):
 
-def print_kdtree(kdtree):
+    w=width/3
 
-    per_level = 1
-    in_level = 0
-    level = 0
+    if current_node.left and current_node.left.data is not None:
+        print(current_node.left.data)
+        graph.add_node(current_node.left, pos = (posx-w, posy-5), label = getOffsettedLabel(current_node.left)) #"b'$"+str(current_node.left.data)+"$'"
+        graph.add_edge(current_node, current_node.left)
+        buildNetworkxGraph(current_node.left, graph, posx-w, posy-5, w)
 
-    for node in level_order(kdtree):
-        if in_level == 0:
-            print
-            print(' ' * 4)
+    if current_node.right and current_node.right.data is not None:
+        graph.add_node(current_node.right, pos = (posx+w, posy-5), label =getOffsettedLabel(current_node.right)) # current_node.right.data
+        graph.add_edge(current_node, current_node.right)
+        buildNetworkxGraph(current_node.right, graph, posx+w, posy-5, w)
 
-            width = int(16 * 10 / per_level)
 
-            node_str = (str(node.data) if node else '').center(width)
-            print(node_str)
+def getOffsettedLabel(k_d_node):
+    if k_d_node.axis==0:
+        return "         "+str(k_d_node.data)
+    elif k_d_node.axis == 1:
+        return str(k_d_node.data)
+    elif k_d_node.axis ==2:
+        return str(k_d_node.data)+"         "
 
-            in_level += 1
 
-            if in_level == per_level:
-                in_level = 0
-                per_level *= 2
-                level += 1
+def ShowNetworkxGraph(nodeTree):
+    import networkx as nx
+    import matplotlib.pyplot as plt
 
-            if level > kdtree.height()-1:
-                break
+    G = nx.Graph()
+    G.add_node(nodeTree,pos=(0,0), label=getOffsettedLabel(nodeTree))
+
+    buildNetworkxGraph(nodeTree, G,0,0,10)
+    # positions  = nx.drawing.nx_agraph.graphviz_layout(G, prog="dot")
+
+
+    print("Drawing...")
+    nx.draw(G, pos=nx.get_node_attributes(G,'pos'),labels=nx.get_node_attributes(G,'label'), with_labels=True)
+    print("...done drawing")
+    print("Showing...")
+    plt.show()
+    print("...done showing")
