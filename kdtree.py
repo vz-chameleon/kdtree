@@ -9,19 +9,81 @@
 # HISTORY
 #
 # 29 january 2018 - Initial design and coding. (@vz-chameleon, Valentina Z.)
-
+import random
 from collections import deque
+
+from math import sqrt
+
+
+class MeansInstance:
+    """ A means element similar to a KDNode, but only containing a 'wgtCent' tuple, and a 'count' integer
+    It can be randomly initialised by specifying its dimensions or it can be initialised with a given tuple
+    """
+
+    def __init__(self, dimensions=None, tple=None):
+        """
+        It can be randomely initialised by specifying its dimensions or it can be initialised with a given tuple
+
+        :param dimensions:
+        :param tple:
+
+        :type dimensions: integer
+        :type tple: tuple
+        """
+        if tple is not None:
+            self.wgt_cent = tple
+        elif dimensions is not None:
+            self.wgt_cent = tuple(random.randint()) * dimensions
+        else:
+            raise AttributeError('Either dimensions or k_d_node needs to be specified')
+        self.count = 0
+
+    def addtree(self, tree_node):
+        """
+
+        :type tree_node: KDNode
+        """
+        self.wgt_cent += tree_node.wgt_center
+        self.count += tree_node.count
+
+    def is_farther(self, otherMedoid, cell):
+        """
+        Not to function proposed in the article (www.cs.umd.edu/~mount/Projects/KMeans/pami02.pdf), but an extremely
+        inefficient one ! First, make it work, then make it fast.
+        :param otherMedoid:
+        :type otherMedoid : MeansInstance
+        :param cell:
+        :return:
+        :rtype : bool
+        """
+        if self == otherMedoid:
+            return False
+        for k_d_node in cell:  # Part to change
+            d1 = sqrt(sum(map(lambda x, y: pow(x - y, 2), k_d_node.data, self.coordinates_tuple)))
+            d2 = sqrt(sum(map(lambda x, y: pow(x - y, 2), k_d_node.data, otherMedoid.coordinates_tuple)))
+            if d1 > d2:
+                return True
+        return False
+
+    @property
+    def coordinates_tuple(self):
+        return tuple(x / self.count for x in self.wgt_cent)
 
 
 class KDNode:
     """ A node data structure that implements the kd-tree specific node and its methods """
 
-    def __init__(self, data=None, left=None, right=None, axis=None, child_axis_calculator=None,dimensions=None):
+    def __init__(self, data, left=None, right=None, axis=None, child_axis_calculator=None, dimensions=None):
         """ Creates a new node for a kd-tree
         If the node will be used within a tree, the axis and the child_axis_calculator function should be supplied.
 
         child_axis_calculator(axis) is used when creating subnodes of the current node.
         This function receives the axis of the parent node and returns the axis of the child node.
+        :type data: tuple
+        :type left: KDNode
+        :type right: KDNode
+        :type axis: integer
+        :type dimensions: integer
         """
         self.data = data
         self.left = left
@@ -29,6 +91,19 @@ class KDNode:
         self.axis = axis
         self.child_axis_calculator = child_axis_calculator
         self.dimensions = dimensions
+
+        self.count = 1
+        self.wgt_center = data
+        if left is not None:
+            self.count += left.count
+            self.wgt_center = tuple(map(lambda x, y: x + y, self.wgt_center, left.wgt_center))
+        if right is not None:
+            self.count += right.count
+            self.wgt_center = tuple(map(lambda x, y: x + y, self.wgt_center, right.wgt_center))
+
+        self.real_centroid = tuple(x / self.count for x in self.wgt_center)
+
+        self.candidate_centers = list()
 
     @property
     def children(self):
@@ -43,6 +118,19 @@ class KDNode:
         if self.right and self.right.data is not None:
             yield self.right, 1
 
+    @property
+    def cell(self):
+        """
+        Returns an iterator for over all the nodes contained in the tree
+        """
+        if self.left:
+            yield self.left.cell
+
+        yield self
+
+        if self.right:
+            yield self.right.cell
+
     def height(self):
         """
         Returns height of the (sub)tree, without considering
@@ -53,6 +141,50 @@ class KDNode:
         min_height = int(bool(self))
 
         return max([min_height] + [c.height() + 1 for c, p in self.children])
+
+    def is_leaf(self):
+        return self.count == 1
+
+    def filter(self, candidate_medoids_set):
+        """
+        The filtering algorithm
+
+        :param candidate_medoids_set: a set of Medoid elements to filter
+        :type candidate_medoids_set: set
+        """
+        if (self.is_leaf()):
+            z_star = closest_candidate(candidate_medoids_set, self)
+            z_star.addtree(self)
+        else:
+            z_star = closest_candidate(candidate_medoids_set, self)
+            for z in candidate_medoids_set:
+                if z.is_farther(z_star, self.cell):
+                    candidate_medoids_set.discard(z)
+            if len(candidate_medoids_set) == 1:
+                z_star.addtree(self)
+            else:
+                if self.left is not None:
+                    self.left.filter(candidate_medoids_set)
+                if self.left is not None:
+                    self.left.filter(candidate_medoids_set)
+
+
+def closest_candidate(medoid_set, mean_tuple):
+    """
+    :param medoid_set:
+    :param mean_tuple:
+    ;type medoid_set :set
+    ;type mean_tuple :tuple
+    :rtype:MeansInstance
+    """
+    distance = float('inf')
+    c_c = None
+    for medoid in medoid_set:
+        temp_dist = sqrt(sum(map(lambda x, y: pow(x - y, 2), medoid.data, mean_tuple)))
+        if temp_dist < distance:
+            distance = temp_dist
+            c_c = medoid
+    return c_c
 
 
 def check_dimensionality(point_list, dimensions=None):
@@ -74,10 +206,11 @@ def construct_kdtree(point_list=None, dimensions=None, axis=0, axis_calc=None):
         dimensions = check_dimensionality(point_list, dimensions)
 
     # by default cycle through the axis
-    axis_calc = axis_calc or (lambda prev_axis: (prev_axis+1) % dimensions)
+    axis_calc = axis_calc or (lambda prev_axis: (prev_axis + 1) % dimensions)
 
     if not point_list:
-        return KDNode(axis=axis, dimensions=dimensions)
+        return
+        # return KDNode(axis=axis, dimensions=dimensions)
 
     # Sort point list and choose median as pivot element
     point_list = list(point_list)
@@ -90,29 +223,31 @@ def construct_kdtree(point_list=None, dimensions=None, axis=0, axis_calc=None):
 
     return KDNode(loc, left, right, axis=axis, child_axis_calculator=axis_calc, dimensions=dimensions)
 
-def buildNetworkxGraph(current_node, graph, posx, posy, width):
 
-    w=width/3
+def buildNetworkxGraph(current_node, graph, posx, posy, width):
+    w = width / 2
 
     if current_node.left and current_node.left.data is not None:
         print(current_node.left.data)
-        graph.add_node(current_node.left, pos = (posx-w, posy-5), label = getOffsettedLabel(current_node.left)) #"b'$"+str(current_node.left.data)+"$'"
+        graph.add_node(current_node.left, pos=(posx - w, posy - 5),
+                       label=getOffsettedLabel(current_node.left))  # "b'$"+str(current_node.left.data)+"$'"
         graph.add_edge(current_node, current_node.left)
-        buildNetworkxGraph(current_node.left, graph, posx-w, posy-5, w)
+        buildNetworkxGraph(current_node.left, graph, posx - w, posy - 5, w)
 
     if current_node.right and current_node.right.data is not None:
-        graph.add_node(current_node.right, pos = (posx+w, posy-5), label =getOffsettedLabel(current_node.right)) # current_node.right.data
+        graph.add_node(current_node.right, pos=(posx + w, posy - 5),
+                       label=getOffsettedLabel(current_node.right))  # current_node.right.data
         graph.add_edge(current_node, current_node.right)
-        buildNetworkxGraph(current_node.right, graph, posx+w, posy-5, w)
+        buildNetworkxGraph(current_node.right, graph, posx + w, posy - 5, w)
 
 
 def getOffsettedLabel(k_d_node):
-    if k_d_node.axis==0:
-        return "         "+str(k_d_node.data)
+    if k_d_node.axis == 0:
+        return "         " + str(k_d_node.data)
     elif k_d_node.axis == 1:
         return str(k_d_node.data)
-    elif k_d_node.axis ==2:
-        return str(k_d_node.data)+"         "
+    elif k_d_node.axis == 2:
+        return str(k_d_node.data) + "         "
 
 
 def ShowNetworkxGraph(nodeTree):
@@ -120,14 +255,14 @@ def ShowNetworkxGraph(nodeTree):
     import matplotlib.pyplot as plt
 
     G = nx.Graph()
-    G.add_node(nodeTree,pos=(0,0), label=getOffsettedLabel(nodeTree))
+    G.add_node(nodeTree, pos=(0, 0), label=getOffsettedLabel(nodeTree))
 
-    buildNetworkxGraph(nodeTree, G,0,0,10)
+    buildNetworkxGraph(nodeTree, G, 0, 0, 10)
     # positions  = nx.drawing.nx_agraph.graphviz_layout(G, prog="dot")
 
 
     print("Drawing...")
-    nx.draw(G, pos=nx.get_node_attributes(G,'pos'),labels=nx.get_node_attributes(G,'label'), with_labels=True)
+    nx.draw(G, pos=nx.get_node_attributes(G, 'pos'), labels=nx.get_node_attributes(G, 'label'), with_labels=True)
     print("...done drawing")
     print("Showing...")
     plt.show()
