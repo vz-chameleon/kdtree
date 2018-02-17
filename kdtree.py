@@ -11,6 +11,7 @@
 # 29 january 2018 - Initial design and coding. (@vz-chameleon, Valentina Z.)
 import random
 from collections import deque
+from itertools import chain
 
 from math import sqrt
 
@@ -33,10 +34,10 @@ class MeansInstance:
         if tple is not None:
             self.wgt_cent = tple
         elif dimensions is not None:
-            self.wgt_cent = tuple(random.randint()) * dimensions
+            self.wgt_cent = tuple({0}) * dimensions
         else:
             raise AttributeError('Either dimensions or k_d_node needs to be specified')
-        self.count = 0
+        self.count = 1
 
     def addtree(self, tree_node):
         """
@@ -48,8 +49,8 @@ class MeansInstance:
 
     def is_farther(self, otherMedoid, cell):
         """
-        Not to function proposed in the article (www.cs.umd.edu/~mount/Projects/KMeans/pami02.pdf), but an extremely
-        inefficient one ! First, make it work, then make it fast.
+        Tried implementing the function proposed in the article (www.cs.umd.edu/~mount/Projects/KMeans/pami02.pdf).
+
         :param otherMedoid:
         :type otherMedoid : MeansInstance
         :param cell:
@@ -58,12 +59,28 @@ class MeansInstance:
         """
         if self == otherMedoid:
             return False
-        for k_d_node in cell:  # Part to change
-            d1 = sqrt(sum(map(lambda x, y: pow(x - y, 2), k_d_node.data, self.coordinates_tuple)))
-            d2 = sqrt(sum(map(lambda x, y: pow(x - y, 2), k_d_node.data, otherMedoid.coordinates_tuple)))
-            if d1 > d2:
-                return True
-        return False
+
+        # Calculating u = z-z* vector
+        u = map(lambda x, y: x-y, self.coordinates_tuple,otherMedoid.coordinates_tuple)
+        # Initializing two tuples which will contain the minimums and maximums values of the cell in each dimension
+        cmin=list(cell.next().data)
+        print(cmin)
+        cmax = list(cmin)
+        # filling those two tuples
+        for k_d_node in cell:
+            for i in range(len(u)):
+                cmin[i] = min(cmin[i], k_d_node.data[i])
+                cmax[i] = max(cmax[i], k_d_node.data[i])
+
+        # Creating v(H) according to the article : "We take the ith coordinate of v(H) to be Cmin[i] if the ith
+        # coordinate of u is negative and Cmax[i] otherwise."
+        vH = tuple(map(lambda ci_min, ci_max, ui: ci_min if ui < 0 else ci_max, cmin, cmax, u))
+
+        # z is pruned if and only if dist(z,v(H)) >= dist(z_star, v(H)), squared distance may be used to avoid squaroot
+        d1 = sum(map(lambda x, y: pow(x - y, 2), vH, self.coordinates_tuple))
+        d2 = sum(map(lambda x, y: pow(x - y, 2), vH, otherMedoid.coordinates_tuple))
+        return d1 >= d2
+
 
     @property
     def coordinates_tuple(self):
@@ -123,13 +140,20 @@ class KDNode:
         """
         Returns an iterator for over all the nodes contained in the tree
         """
-        if self.left:
-            yield self.left.cell
+        def me():
+            yield self
 
-        yield self
+        iterator = me()
 
         if self.right:
-            yield self.right.cell
+            iterator=chain(self.right.cell,iterator)
+        if self.left:
+            iterator = chain(self.left.cell,iterator)
+
+        return iterator
+
+
+
 
     def height(self):
         """
@@ -153,20 +177,24 @@ class KDNode:
         :type candidate_medoids_set: set
         """
         if (self.is_leaf()):
-            z_star = closest_candidate(candidate_medoids_set, self)
+            z_star = closest_candidate(candidate_medoids_set, self.real_centroid)
             z_star.addtree(self)
+            self.candidate_centers=set(z_star)
         else:
-            z_star = closest_candidate(candidate_medoids_set, self)
+            z_star = closest_candidate(candidate_medoids_set, self.real_centroid)
+            new_candidate_medoids_set = set(candidate_medoids_set)
             for z in candidate_medoids_set:
                 if z.is_farther(z_star, self.cell):
-                    candidate_medoids_set.discard(z)
-            if len(candidate_medoids_set) == 1:
+                    new_candidate_medoids_set.discard(z)
+            if len(new_candidate_medoids_set) == 1:
                 z_star.addtree(self)
             else:
                 if self.left is not None:
-                    self.left.filter(candidate_medoids_set)
+                    self.left.filter(new_candidate_medoids_set)
                 if self.left is not None:
-                    self.left.filter(candidate_medoids_set)
+                    self.left.filter(new_candidate_medoids_set)
+            self.candidate_centers=new_candidate_medoids_set
+
 
 
 def closest_candidate(medoid_set, mean_tuple):
@@ -180,7 +208,7 @@ def closest_candidate(medoid_set, mean_tuple):
     distance = float('inf')
     c_c = None
     for medoid in medoid_set:
-        temp_dist = sqrt(sum(map(lambda x, y: pow(x - y, 2), medoid.data, mean_tuple)))
+        temp_dist = sqrt(sum(map(lambda x, y: pow(x - y, 2), medoid.coordinates_tuple, mean_tuple)))
         if temp_dist < distance:
             distance = temp_dist
             c_c = medoid
