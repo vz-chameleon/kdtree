@@ -19,9 +19,9 @@ The project is written in Python 2 and uses the following libraries :
 To see what this program can do please run the 'test.py' script with the data file path as the first argument and
 the output folder as the second argument
 
-'''
+```
 python2 test.py ./data/astro.xyz ./results
-'''
+```
 
 ## License
 This software is licensed under the GPL v3.0 License
