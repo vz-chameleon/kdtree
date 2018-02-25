@@ -169,7 +169,7 @@ class KDNode:
     def filter(self, candidate_centroids_set):
         """
         The filtering algorithm
-
+        This is an implementation of the algorithm proposer in the paper (www.cs.umd.edu/~mount/Projects/KMeans/pami02.pdf)
         :param candidate_centroids_set: a set of Medoid elements to filter
         :type candidate_centroids_set: set
         """
