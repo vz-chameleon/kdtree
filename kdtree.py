@@ -47,23 +47,23 @@ class MeansInstance:
         self.wgt_cent += tree_node.wgt_center
         self.count += tree_node.count
 
-    def is_farther(self, otherMedoid, cell):
+    def is_farther(self, otherCentroid, cell):
         """
         Tried implementing the function proposed in the article (www.cs.umd.edu/~mount/Projects/KMeans/pami02.pdf).
 
-        :param otherMedoid:
-        :type otherMedoid : MeansInstance
+        :param otherCentroid:
+        :type otherCentroid : MeansInstance
         :param cell:
         :return:
         :rtype : bool
         """
-        if self == otherMedoid:
+        if self == otherCentroid:
             return False
 
         # Calculating u = z-z* vector
-        u = map(lambda x, y: x-y, self.coordinates_tuple,otherMedoid.coordinates_tuple)
+        u = map(lambda x, y: x - y, self.coordinates_tuple, otherCentroid.coordinates_tuple)
         # Initializing two tuples which will contain the minimums and maximums values of the cell in each dimension
-        cmin=list(cell.next().data)
+        cmin = list(cell.next().data)
         print(cmin)
         cmax = list(cmin)
         # filling those two tuples
@@ -78,9 +78,8 @@ class MeansInstance:
 
         # z is pruned if and only if dist(z,v(H)) >= dist(z_star, v(H)), squared distance may be used to avoid squaroot
         d1 = sum(map(lambda x, y: pow(x - y, 2), vH, self.coordinates_tuple))
-        d2 = sum(map(lambda x, y: pow(x - y, 2), vH, otherMedoid.coordinates_tuple))
+        d2 = sum(map(lambda x, y: pow(x - y, 2), vH, otherCentroid.coordinates_tuple))
         return d1 >= d2
-
 
     @property
     def coordinates_tuple(self):
@@ -140,20 +139,18 @@ class KDNode:
         """
         Returns an iterator for over all the nodes contained in the tree
         """
+
         def me():
             yield self
 
         iterator = me()
 
         if self.right:
-            iterator=chain(self.right.cell,iterator)
+            iterator = chain(self.right.cell, iterator)
         if self.left:
-            iterator = chain(self.left.cell,iterator)
+            iterator = chain(self.left.cell, iterator)
 
         return iterator
-
-
-
 
     def height(self):
         """
@@ -169,36 +166,40 @@ class KDNode:
     def is_leaf(self):
         return self.count == 1
 
-    def filter(self, candidate_medoids_set):
+    def filter(self, candidate_centroids_set):
         """
         The filtering algorithm
 
-        :param candidate_medoids_set: a set of Medoid elements to filter
-        :type candidate_medoids_set: set
+        :param candidate_centroids_set: a set of Medoid elements to filter
+        :type candidate_centroids_set: set
         """
-        if (self.is_leaf()):
-            z_star = closest_candidate(candidate_medoids_set, self.real_centroid)
+        if self.is_leaf():
+            z_star = closest_candidate(candidate_centroids_set, self.real_centroid)
             z_star.addtree(self)
-            self.candidate_centers=set(z_star)
+            self.candidate_centers = set(z_star)
         else:
-            z_star = closest_candidate(candidate_medoids_set, self.real_centroid)
-            new_candidate_medoids_set = set(candidate_medoids_set)
-            for z in candidate_medoids_set:
+            z_star = closest_candidate(candidate_centroids_set, self.real_centroid)
+            new_candidate_centroids_set = set(candidate_centroids_set)
+            for z in candidate_centroids_set:
                 if z.is_farther(z_star, self.cell):
-                    new_candidate_medoids_set.discard(z)
-            if len(new_candidate_medoids_set) == 1:
+                    new_candidate_centroids_set.discard(z)
+            if len(new_candidate_centroids_set) == 1:
                 z_star.addtree(self)
             else:
                 if self.left is not None:
-                    self.left.filter(new_candidate_medoids_set)
+                    self.left.filter(new_candidate_centroids_set)
                 if self.left is not None:
-                    self.left.filter(new_candidate_medoids_set)
-            self.candidate_centers=new_candidate_medoids_set
+                    self.left.filter(new_candidate_centroids_set)
+            self.candidate_centers = new_candidate_centroids_set
 
 
+# ---------------------------------------------------------------------------------
+# ----- MAIN FUNCTIONS USING CLASSES DEFINED ABOVE ------------------------------
+# --------------------------------------------------------------------------------
 
 def closest_candidate(medoid_set, mean_tuple):
     """
+    Returns the
     :param medoid_set:
     :param mean_tuple:
     ;type medoid_set :set
