@@ -15,7 +15,7 @@ with open('astro.xyz') as datafile:
 
         data_list.append(num_values)
 
-    print data_list
 
+# Ici, la construction du kdtree prend extrêmement longtemps et je ne suis pas arrivée à determiner pourquoi...
 astro_tree = construct_kdtree(data_list)
 ShowNetworkxGraph(astro_tree)

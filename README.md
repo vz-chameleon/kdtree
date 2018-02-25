@@ -16,11 +16,10 @@ The project is written in Python 2 and uses the following libraries :
  - Numpy
 
 ### Run
-To see what this program can do please run the 'test.py' script with the data file path as the first argument and
-the output folder as the second argument
+To see what this program can do please run the 'test_kdtree.py' script or the 'astro_clustering.py'
 
 ```
-python2 test.py ./data/astro.xyz ./results
+python2 test_kdtree.py
 ```
 
 ## License
